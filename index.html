@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OIQ Wave Tracker — Survey Operations</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f12;
+    --surface: #13161c;
+    --surface2: #1a1e27;
+    --border: #252a35;
+    --border2: #2e3545;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --accent: #3b82f6;
+    --accent2: #1d4ed8;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --warn: #f59e0b;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .logo-mark {
+    width: 32px; height: 32px;
+    background: var(--accent);
+    display: grid;
+    place-items: center;
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 14px;
+    color: #fff;
+  }
+  .header-title {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--text);
+  }
+  .header-sub {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--mono);
+    margin-left: 4px;
+  }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .clock {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .tz-badge {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+  }
+
+  /* FILTERS */
+  .filters {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .filter-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .filter-group { display: flex; align-items: center; gap: 6px; }
+  .filter-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 5px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-btn:hover { border-color: var(--accent); color: var(--text); }
+  .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
+
+  select, input[type="number"], input[type="date"] {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  select:hover, input:hover { border-color: var(--border2); }
+  select:focus, input:focus { border-color: var(--accent); }
+  select option { background: var(--surface2); }
+
+  .range-inputs { display: flex; align-items: center; gap: 6px; }
+  .range-inputs span { color: var(--muted); font-size: 11px; font-family: var(--mono); }
+
+  /* STATS BAR */
+  .stats-bar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+  }
+  .stat {
+    padding: 10px 20px;
+    border-right: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .stat:first-child { padding-left: 0; }
+  .stat-num {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1;
+  }
+  .stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .stat-num.green { color: var(--success); }
+  .stat-num.red { color: var(--danger); }
+  .stat-num.blue { color: var(--accent); }
+  .stat-num.yellow { color: var(--warn); }
+
+  /* TABLE WRAPPER */
+  .table-wrap {
+    padding: 16px 24px;
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+  col.col-wave { width: 80px; }
+  col.col-week { width: 160px; }
+  col.col-load-day { width: 110px; }
+  col.col-datetime { width: 200px; }
+  col.col-status { width: 120px; }
+  col.col-notes { width: auto; }
+
+  thead tr {
+    border-bottom: 2px solid var(--border2);
+  }
+  th {
+    padding: 8px 12px;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    font-weight: 500;
+    background: var(--surface);
+  }
+  th:first-child { padding-left: 8px; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  tbody tr:hover { background: var(--surface2); }
+  tbody tr.wave-a { }
+  tbody tr.wave-b { background: rgba(255,255,255,0.015); }
+  tbody tr.current-week { border-left: 3px solid var(--accent) !important; }
+
+  td {
+    padding: 7px 12px;
+    vertical-align: middle;
+  }
+  td:first-child { padding-left: 8px; }
+
+  /* WAVE BADGE */
+  .wave-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .wave-badge .wave-num { color: var(--text); }
+  .wave-badge .wave-letter-a { color: #60a5fa; }
+  .wave-badge .wave-letter-b { color: #a78bfa; }
+
+  /* WEEK CELL */
+  .week-cell { font-size: 12px; color: var(--muted); }
+  .week-cell .week-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--accent);
+    background: rgba(59,130,246,0.1);
+    border: 1px solid rgba(59,130,246,0.2);
+    padding: 1px 6px;
+    display: inline-block;
+    margin-bottom: 2px;
+  }
+  .week-cell .week-date { font-size: 11px; color: var(--muted); }
+
+  /* LOAD DAY */
+  .load-day {
+    font-family: var(--mono);
+    font-size: 11px;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .load-day .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+  .dot-a { background: #60a5fa; }
+  .dot-b { background: #a78bfa; }
+
+  /* DATETIME INPUT */
+  .dt-cell { display: flex; align-items: center; gap: 6px; }
+  .dt-input-wrap { position: relative; flex: 1; }
+  .dt-display {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text);
+    cursor: pointer;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 6px;
+    min-width: 170px;
+  }
+  .dt-display:hover { border-color: var(--accent); background: var(--surface2); }
+  .dt-display .dt-icon { color: var(--muted); font-size: 10px; }
+  .dt-display.empty { color: var(--muted); }
+  .dt-edit {
+    display: none;
+    position: absolute;
+    top: 0; left: 0;
+    z-index: 50;
+    background: var(--surface2);
+    border: 1px solid var(--accent);
+    padding: 8px;
+    min-width: 280px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .dt-edit.open { display: block; }
+  .dt-edit label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .dt-edit input[type="datetime-local"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    padding: 6px 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+    margin-bottom: 8px;
+  }
+  .dt-edit input[type="datetime-local"]:focus { border-color: var(--accent); }
+  .dt-edit-btns { display: flex; gap: 6px; }
+  .btn-save {
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    padding: 5px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+    flex: 1;
+  }
+  .btn-save:hover { background: var(--accent2); }
+  .btn-clear {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    padding: 5px 12px;
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .btn-clear:hover { border-color: var(--danger); color: var(--danger); }
+  .btn-cancel {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    padding: 5px 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .btn-cancel:hover { border-color: var(--muted); color: var(--text); }
+
+  /* STATUS */
+  .status-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 14px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    border: none;
+    cursor: default;
+    text-transform: uppercase;
+  }
+  .status-btn .s-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .status-success {
+    background: rgba(34,197,94,0.15);
+    color: var(--success);
+    border: 1px solid rgba(34,197,94,0.3);
+  }
+  .status-success .s-dot { background: var(--success); box-shadow: 0 0 6px var(--success); }
+  .status-danger {
+    background: rgba(239,68,68,0.15);
+    color: var(--danger);
+    border: 1px solid rgba(239,68,68,0.3);
+  }
+  .status-danger .s-dot { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+  .status-pending {
+    background: rgba(100,116,139,0.1);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .status-pending .s-dot { background: var(--muted); }
+
+  /* CURRENT WEEK HIGHLIGHT */
+  .current-marker {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-family: var(--mono); font-size: 9px; color: var(--accent);
+    background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.25);
+    padding: 1px 5px; margin-left: 6px; vertical-align: middle;
+    letter-spacing: 0.08em;
+  }
+
+  /* EMPTY */
+  .empty-row td {
+    text-align: center;
+    padding: 40px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* PAGER */
+  .pager {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 24px;
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .pager-info { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .pager-btns { display: flex; gap: 4px; }
+  .pager-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); padding: 4px 10px;
+    font-family: var(--mono); font-size: 11px; cursor: pointer;
+  }
+  .pager-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+  .pager-btn:disabled { opacity: 0.3; cursor: default; }
+
+  .today-jump {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--accent); padding: 5px 14px;
+    font-family: var(--mono); font-size: 11px; cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+  }
+  .today-jump:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .edit-icon { font-size: 10px; color: var(--muted); margin-left: 4px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo-mark">OIQ</div>
+    <div>
+      <span class="header-title">OIQ WAVE TRACKER</span>
+      <span class="header-sub">// Survey Operations</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="clock" id="clock">—</div>
+    <div class="tz-badge">PST / PDT</div>
+    <button class="today-jump" onclick="jumpToCurrentWeek()">→ THIS WEEK</button>
+  </div>
+</div>
+
+<div class="filters">
+  <span class="filter-label">View:</span>
+  <div class="filter-group">
+    <button class="filter-btn" onclick="setView('all',this)">All Year</button>
+    <button class="filter-btn active" onclick="setView('month',this)">Month</button>
+    <button class="filter-btn" onclick="setView('week',this)">Week</button>
+    <button class="filter-btn" onclick="setView('range',this)">Date Range</button>
+  </div>
+  <div class="sep"></div>
+
+  <div class="filter-group" id="month-filter">
+    <span class="filter-label">Month:</span>
+    <select id="month-select" onchange="applyFilters()">
+      <option value="0">January</option><option value="1">February</option>
+      <option value="2">March</option><option value="3">April</option>
+      <option value="4">May</option><option value="5">June</option>
+      <option value="6">July</option><option value="7">August</option>
+      <option value="8">September</option><option value="9">October</option>
+      <option value="10">November</option><option value="11">December</option>
+    </select>
+    <select id="year-select" onchange="applyFilters()">
+    </select>
+  </div>
+
+  <div class="filter-group" id="week-filter" style="display:none">
+    <span class="filter-label">Week #:</span>
+    <input type="number" id="week-num" min="1" max="52" value="1" style="width:60px" oninput="applyFilters()">
+  </div>
+
+  <div class="filter-group" id="range-filter" style="display:none">
+    <span class="filter-label">From:</span>
+    <input type="date" id="range-from" onchange="applyFilters()">
+    <span class="filter-label" style="margin-left:4px">To:</span>
+    <input type="date" id="range-to" onchange="applyFilters()">
+  </div>
+
+  <div class="sep"></div>
+  <span class="filter-label">Year:</span>
+  <select id="main-year-select" onchange="changeYear()"></select>
+</div>
+
+<div class="stats-bar" id="stats-bar"></div>
+
+<div class="table-wrap">
+  <table>
+    <colgroup>
+      <col class="col-wave">
+      <col class="col-week">
+      <col class="col-load-day">
+      <col class="col-datetime">
+      <col class="col-status">
+      <col class="col-notes">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>Wave</th>
+        <th>Week Of</th>
+        <th>Load Day</th>
+        <th>Actual Load Time <span style="color:var(--accent);font-size:9px">(click to edit)</span></th>
+        <th>Status vs 6AM PST</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody id="table-body"></tbody>
+  </table>
+</div>
+
+<div class="pager">
+  <div class="pager-info" id="pager-info">— rows</div>
+  <div class="pager-btns">
+    <button class="pager-btn" id="btn-prev" onclick="changePage(-1)">← Prev</button>
+    <button class="pager-btn" id="btn-next" onclick="changePage(1)">Next →</button>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────
+const PAGE_SIZE = 30;
+let currentPage = 0;
+let currentView = 'month';
+let selectedYear = new Date().getFullYear();
+let waves = [];         // 104 rows (52 weeks × 2 waves)
+let filtered = [];      // after filter
+let savedTimes = {};    // waveId -> ISO string
+let savedNotes = {};    // waveId -> string
+
+// ── INIT ───────────────────────────────────────────────────────────────
+function init() {
+  populateYearSelects();
+  const now = new Date();
+  document.getElementById('month-select').value = now.getMonth();
+  document.getElementById('week-num').value = getWaveNumForDate(now) || 1;
+  generateWaves();
+  applyFilters();
+  startClock();
+  jumpToCurrentWeek();
+  autoSelectCurrentMonth();
+}
+
+function populateYearSelects() {
+  const year = new Date().getFullYear();
+  [document.getElementById('year-select'), document.getElementById('main-year-select')].forEach(sel => {
+    for (let y = year - 2; y <= year + 2; y++) {
+      const o = document.createElement('option');
+      o.value = y; o.textContent = y;
+      if (y === year) o.selected = true;
+      sel.appendChild(o);
+    }
+  });
+}
+
+function autoSelectCurrentMonth() {
+  document.getElementById('month-select').value = new Date().getMonth();
+  document.getElementById('year-select').value = selectedYear;
+}
+
+function changeYear() {
+  selectedYear = parseInt(document.getElementById('main-year-select').value);
+  generateWaves();
+  applyFilters();
+}
+
+// ── WAVE GENERATION ────────────────────────────────────────────────────
+function generateWaves() {
+  waves = [];
+
+  // Wave 1 starts on the first Monday that falls on Jan 5 or later.
+  // This ensures we never start in the previous year's last week.
+  // Rule: first Monday >= Jan 5 of selectedYear.
+  const anchor = firstMondayOnOrAfterJan5(selectedYear);
+
+  for (let w = 1; w <= 52; w++) {
+    const monday = new Date(anchor);
+    monday.setDate(anchor.getDate() + (w - 1) * 7);
+
+    const thursday = new Date(monday);
+    thursday.setDate(monday.getDate() + 3);
+
+    ['A', 'B'].forEach(letter => {
+      const loadDay = letter === 'A' ? new Date(monday) : new Date(thursday);
+      waves.push({
+        id: `${w}${letter}`,
+        waveNum: w,
+        letter,
+        weekOf: new Date(monday),
+        loadDay,
+        deadlineHour: 6,
+      });
+    });
+  }
+}
+
+function firstMondayOnOrAfterJan5(year) {
+  // Start at Jan 5 (earliest possible Wave 1 Monday)
+  const d = new Date(year, 0, 5);
+  // Advance to next Monday if not already Monday (0=Sun,1=Mon,...6=Sat)
+  const day = d.getDay();
+  if (day !== 1) {
+    d.setDate(d.getDate() + ((1 + 7 - day) % 7));
+  }
+  return d;
+}
+
+function getWaveNumForDate(date) {
+  // Returns wave number (1-52) for a given date, or null if outside range
+  const anchor = firstMondayOnOrAfterJan5(date.getFullYear());
+  const diff = Math.floor((date - anchor) / (7 * 86400000));
+  if (diff < 0 || diff >= 52) return null;
+  return diff + 1;
+}
+
+function getCurrentWeekNum() {
+  return getWaveNumForDate(new Date());
+}
+
+// ── FILTERS ────────────────────────────────────────────────────────────
+function setView(v, el) {
+  currentView = v;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.getElementById('month-filter').style.display = v === 'month' ? 'flex' : 'none';
+  document.getElementById('week-filter').style.display  = v === 'week'  ? 'flex' : 'none';
+  document.getElementById('range-filter').style.display = v === 'range' ? 'flex' : 'none';
+  currentPage = 0;
+  applyFilters();
+}
+
+function applyFilters() {
+  const year = parseInt(document.getElementById('main-year-select').value) || selectedYear;
+  selectedYear = year;
+
+  if (currentView === 'all') {
+    filtered = waves.slice();
+  } else if (currentView === 'month') {
+    const m = parseInt(document.getElementById('month-select').value);
+    const y = parseInt(document.getElementById('year-select').value) || year;
+    filtered = waves.filter(w => {
+      const d = w.weekOf;
+      // include if the wave's week overlaps with the month
+      const wEnd = new Date(w.loadDay);
+      return (d.getMonth() === m && d.getFullYear() === y) ||
+             (wEnd.getMonth() === m && wEnd.getFullYear() === y);
+    });
+  } else if (currentView === 'week') {
+    const wn = parseInt(document.getElementById('week-num').value);
+    filtered = waves.filter(w => w.waveNum === wn);
+  } else if (currentView === 'range') {
+    const from = document.getElementById('range-from').value;
+    const to   = document.getElementById('range-to').value;
+    if (!from || !to) { filtered = waves.slice(); }
+    else {
+      const fd = new Date(from + 'T00:00:00');
+      const td = new Date(to   + 'T23:59:59');
+      filtered = waves.filter(w => w.loadDay >= fd && w.loadDay <= td);
+    }
+  }
+  currentPage = 0;
+  renderTable();
+  renderStats();
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────────
+function renderTable() {
+  const tbody = document.getElementById('table-body');
+  const start = currentPage * PAGE_SIZE;
+  const slice = filtered.slice(start, start + PAGE_SIZE);
+  const curWeek = getCurrentWeekNum();
+  const today = new Date();
+
+  if (slice.length === 0) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">No waves match the current filter.</td></tr>`;
+  } else {
+    tbody.innerHTML = slice.map(w => buildRow(w, curWeek, today)).join('');
+  }
+
+  updatePager();
+}
+
+function buildRow(w, curWeek, today) {
+  const isCurrent = w.waveNum === curWeek && today.getFullYear() === selectedYear;
+  const cls = `wave-${w.letter.toLowerCase()}${isCurrent ? ' current-week' : ''}`;
+
+  // Wave badge
+  const badge = `<span class="wave-badge">
+    <span class="wave-num">${w.waveNum}</span><span class="wave-letter-${w.letter.toLowerCase()}">${w.letter}</span>
+  </span>${isCurrent ? `<span class="current-marker">NOW</span>` : ''}`;
+
+  // Week of
+  const weekOf = formatDate(w.weekOf, 'MMM D');
+  const weekCell = `<div class="week-cell">
+    <div class="week-tag">WK ${w.waveNum}</div>
+    <div class="week-date">Week of ${weekOf}</div>
+  </div>`;
+
+  // Load day
+  const loadDayName = w.letter === 'A' ? 'Monday' : 'Thursday';
+  const loadCell = `<span class="load-day">
+    <span class="dot dot-${w.letter.toLowerCase()}"></span>${loadDayName} ${formatDate(w.loadDay, 'M/D')}
+  </span>`;
+
+  // DateTime
+  const dt = savedTimes[w.id] || '';
+  const dtCell = buildDtCell(w.id, dt);
+
+  // Status
+  const statusCell = buildStatus(w, dt);
+
+  // Notes
+  const note = savedNotes[w.id] || '';
+  const noteCell = `<input type="text" value="${escHtml(note)}" placeholder="—"
+    onchange="saveNote('${w.id}', this.value)"
+    style="background:transparent;border:none;border-bottom:1px solid var(--border);
+           color:var(--muted);font-family:var(--mono);font-size:11px;width:100%;
+           padding:2px 4px;outline:none;"
+    onfocus="this.style.borderBottomColor='var(--accent)'"
+    onblur="this.style.borderBottomColor='var(--border)'">`;
+
+  return `<tr class="${cls}" id="row-${w.id}">
+    <td>${badge}</td>
+    <td>${weekCell}</td>
+    <td>${loadCell}</td>
+    <td>${dtCell}</td>
+    <td>${statusCell}</td>
+    <td>${noteCell}</td>
+  </tr>`;
+}
+
+function buildDtCell(waveId, dtValue) {
+  const displayText = dtValue ? formatDT(dtValue) : '— click to set';
+  const isEmpty = !dtValue;
+  return `<div class="dt-cell">
+    <div class="dt-input-wrap">
+      <div class="dt-display ${isEmpty ? 'empty' : ''}" onclick="openEdit('${waveId}')">
+        <span class="dt-icon">⏱</span>${displayText}
+      </div>
+      <div class="dt-edit" id="edit-${waveId}">
+        <label>Actual Load Date &amp; Time (Local)</label>
+        <input type="datetime-local" id="dti-${waveId}" value="${dtValue ? toLocalDTInput(dtValue) : ''}">
+        <div class="dt-edit-btns">
+          <button class="btn-save" onclick="saveDT('${waveId}')">Save</button>
+          <button class="btn-clear" onclick="clearDT('${waveId}')">Clear</button>
+          <button class="btn-cancel" onclick="closeEdit('${waveId}')">✕</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildStatus(w, dtValue) {
+  if (!dtValue) {
+    return `<span class="status-btn status-pending"><span class="s-dot"></span>PENDING</span>`;
+  }
+  const loadDate = new Date(dtValue);
+  // 6 AM PST = UTC+8 offset (PST = UTC-8, so 6AM PST = 14:00 UTC)
+  // We'll compare using PST: create a date for 6AM PST on the load day
+  const deadline = getPSTDeadline(w.loadDay);
+  if (loadDate <= deadline) {
+    return `<span class="status-btn status-success"><span class="s-dot"></span>ON TIME</span>`;
+  } else {
+    return `<span class="status-btn status-danger"><span class="s-dot"></span>LATE</span>`;
+  }
+}
+
+function getPSTDeadline(loadDay) {
+  // 6:00 AM PST on loadDay
+  // PST = UTC-8, PDT = UTC-7
+  // We'll use the date's year/month/day and set to 06:00 in PST
+  const y = loadDay.getFullYear(), m = loadDay.getMonth(), d = loadDay.getDate();
+  // Check if PDT (March 2nd Sunday to Nov 1st Sunday approx)
+  const isPDT = isDaylightSaving(loadDay);
+  const utcOffset = isPDT ? 7 : 8; // PDT = UTC-7, PST = UTC-8
+  // 6AM PST/PDT in UTC
+  return new Date(Date.UTC(y, m, d, 6 + utcOffset, 0, 0));
+}
+
+function isDaylightSaving(date) {
+  // US DST: 2nd Sunday in March to 1st Sunday in November
+  const year = date.getFullYear();
+  const dstStart = nthSunday(year, 2, 2); // March, 2nd Sunday
+  const dstEnd   = nthSunday(year, 10, 1); // November, 1st Sunday
+  return date >= dstStart && date < dstEnd;
+}
+
+function nthSunday(year, month, n) {
+  let count = 0;
+  for (let d = 1; d <= 31; d++) {
+    const dt = new Date(year, month, d);
+    if (dt.getMonth() !== month) break;
+    if (dt.getDay() === 0) { count++; if (count === n) return dt; }
+  }
+}
+
+// ── STATS ──────────────────────────────────────────────────────────────
+function renderStats() {
+  const total = filtered.length;
+  let onTime = 0, late = 0, pending = 0;
+  filtered.forEach(w => {
+    const dt = savedTimes[w.id];
+    if (!dt) { pending++; return; }
+    const loadDate = new Date(dt);
+    const deadline = getPSTDeadline(w.loadDay);
+    if (loadDate <= deadline) onTime++; else late++;
+  });
+  document.getElementById('stats-bar').innerHTML = `
+    <div class="stat"><div><div class="stat-num blue">${total}</div><div class="stat-label">Waves Shown</div></div></div>
+    <div class="stat"><div><div class="stat-num green">${onTime}</div><div class="stat-label">On Time</div></div></div>
+    <div class="stat"><div><div class="stat-num red">${late}</div><div class="stat-label">Late</div></div></div>
+    <div class="stat"><div><div class="stat-num yellow">${pending}</div><div class="stat-label">Pending</div></div></div>
+  `;
+}
+
+// ── PAGER ──────────────────────────────────────────────────────────────
+function updatePager() {
+  const total = filtered.length;
+  const start = currentPage * PAGE_SIZE + 1;
+  const end   = Math.min((currentPage + 1) * PAGE_SIZE, total);
+  document.getElementById('pager-info').textContent = total ? `Showing ${start}–${end} of ${total} waves` : '0 waves';
+  document.getElementById('btn-prev').disabled = currentPage === 0;
+  document.getElementById('btn-next').disabled = (currentPage + 1) * PAGE_SIZE >= total;
+}
+
+function changePage(dir) {
+  currentPage += dir;
+  renderTable();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// ── EDIT HANDLERS ──────────────────────────────────────────────────────
+function openEdit(id) {
+  closeAllEdits();
+  document.getElementById(`edit-${id}`).classList.add('open');
+}
+function closeEdit(id) {
+  document.getElementById(`edit-${id}`).classList.remove('open');
+}
+function closeAllEdits() {
+  document.querySelectorAll('.dt-edit.open').forEach(el => el.classList.remove('open'));
+}
+
+function saveDT(id) {
+  const val = document.getElementById(`dti-${id}`).value;
+  if (!val) { clearDT(id); return; }
+  // store as ISO
+  savedTimes[id] = new Date(val).toISOString();
+  closeAllEdits();
+  renderTable();
+  renderStats();
+}
+
+function clearDT(id) {
+  delete savedTimes[id];
+  closeAllEdits();
+  renderTable();
+  renderStats();
+}
+
+function saveNote(id, val) {
+  savedNotes[id] = val;
+}
+
+// ── JUMP ────────────────────────────────────────────────────────────────
+function jumpToCurrentWeek() {
+  const now = new Date();
+  if (now.getFullYear() !== selectedYear) return;
+  const wn = getWaveNumForDate(now) || 1;
+  // Switch to week view
+  currentView = 'week';
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.filter-btn')[2].classList.add('active');
+  document.getElementById('month-filter').style.display = 'none';
+  document.getElementById('week-filter').style.display  = 'flex';
+  document.getElementById('range-filter').style.display = 'none';
+  document.getElementById('week-num').value = wn;
+  currentPage = 0;
+  applyFilters();
+}
+
+// ── CLOCK ──────────────────────────────────────────────────────────────
+function startClock() {
+  function update() {
+    const now = new Date();
+    const pst = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+    const h = String(pst.getHours()).padStart(2,'0');
+    const m = String(pst.getMinutes()).padStart(2,'0');
+    const s = String(pst.getSeconds()).padStart(2,'0');
+    document.getElementById('clock').textContent = `${h}:${m}:${s}`;
+  }
+  update();
+  setInterval(update, 1000);
+}
+
+// ── HELPERS ────────────────────────────────────────────────────────────
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function formatDate(d, fmt) {
+  if (fmt === 'MMM D') return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  if (fmt === 'M/D')   return `${d.getMonth()+1}/${d.getDate()}`;
+  return d.toLocaleDateString();
+}
+
+function formatDT(iso) {
+  const d = new Date(iso);
+  // Display in PST
+  return d.toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+    hour12: true
+  }) + ' PST';
+}
+
+function toLocalDTInput(iso) {
+  // Convert ISO to local datetime-local input format
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Close edits on outside click
+document.addEventListener('click', e => {
+  if (!e.target.closest('.dt-input-wrap')) closeAllEdits();
+});
+
+// ── START ──────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
