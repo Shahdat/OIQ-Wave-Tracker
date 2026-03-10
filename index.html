@@ -493,7 +493,7 @@
         <th>Week Of</th>
         <th>Load Day</th>
         <th>Actual Load Time <span style="color:var(--accent);font-size:9px">(click to edit)</span></th>
-        <th>Status vs 6AM PST</th>
+        <th>Status vs 7:30AM PST</th>
         <th>Notes</th>
       </tr>
     </thead>
@@ -766,7 +766,7 @@ function getPSTDeadline(loadDay) {
   const isPDT = isDaylightSaving(loadDay);
   const utcOffset = isPDT ? 7 : 8; // PDT = UTC-7, PST = UTC-8
   // 6AM PST/PDT in UTC
-  return new Date(Date.UTC(y, m, d, 6 + utcOffset, 0, 0));
+  return new Date(Date.UTC(y, m, d, 7 + utcOffset, 30, 0));
 }
 
 function isDaylightSaving(date) {
