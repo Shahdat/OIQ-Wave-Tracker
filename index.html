@@ -428,9 +428,33 @@
     </div>
   </div>
   <div class="header-right">
+    <div id="sync-status" style="font-family:var(--mono);font-size:11px;color:var(--muted);">⟳ Loading...</div>
     <div class="clock" id="clock">—</div>
     <div class="tz-badge">PST / PDT</div>
     <button class="today-jump" onclick="jumpToCurrentWeek()">→ THIS WEEK</button>
+  </div>
+</div>
+
+<!-- SETUP MODAL -->
+<div id="setup-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:999;display:none;place-items:center;">
+  <div style="background:var(--surface);border:1px solid var(--accent);padding:32px;max-width:520px;width:90%;font-family:var(--mono);">
+    <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:8px;">⚙ One-Time Setup Required</div>
+    <div style="font-size:11px;color:var(--muted);margin-bottom:20px;line-height:1.7;">
+      To persist data across all users, this app uses <strong style="color:var(--accent)">JSONBin.io</strong> (free).<br>
+      Follow these steps once, then paste your credentials below:
+      <ol style="margin:12px 0 0 16px;color:var(--muted);line-height:2;">
+        <li>Go to <strong style="color:var(--text)">jsonbin.io</strong> → Sign up free</li>
+        <li>Create a new <strong style="color:var(--text)">Bin</strong> with content: <code style="color:var(--accent)">{}</code></li>
+        <li>Copy the <strong style="color:var(--text)">Bin ID</strong> from the URL</li>
+        <li>Go to <strong style="color:var(--text)">API Keys</strong> → copy your <strong style="color:var(--text)">Master Key</strong></li>
+      </ol>
+    </div>
+    <label style="font-size:10px;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;">Bin ID</label>
+    <input id="setup-bin-id" type="text" placeholder="e.g. 64f3a1b2e3..." style="width:100%;margin:4px 0 12px;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:8px;font-family:var(--mono);font-size:12px;outline:none;">
+    <label style="font-size:10px;letter-spacing:0.1em;color:var(--muted);text-transform:uppercase;">Master Key</label>
+    <input id="setup-api-key" type="text" placeholder="e.g. $2a$10$abc123..." style="width:100%;margin:4px 0 16px;background:var(--bg);border:1px solid var(--border2);color:var(--text);padding:8px;font-family:var(--mono);font-size:12px;outline:none;">
+    <div style="font-size:10px;color:var(--warn);margin-bottom:16px;">⚠ After saving, add these values directly into the HTML file's JSONBIN_API_KEY and JSONBIN_BIN_ID constants so they persist for all users.</div>
+    <button onclick="applySetup()" style="background:var(--accent);border:none;color:#fff;padding:8px 20px;font-family:var(--mono);font-size:12px;cursor:pointer;width:100%;">Connect &amp; Save</button>
   </div>
 </div>
 
@@ -510,6 +534,12 @@
 </div>
 
 <script>
+// ── CONFIG ─────────────────────────────────────────────────────────────
+// JSONBin.io free hosted storage — shared across all users
+const JSONBIN_API_KEY = '$2a$10$gKMYeM04A6gTG97abiFm9.NJLjRsBE.iYpFJT.OUvBxj/giVLh0aG';
+const JSONBIN_BIN_ID  = '69af6cc4d0ea881f40027f27';
+const JSONBIN_URL     = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+
 // ── STATE ──────────────────────────────────────────────────────────────
 const PAGE_SIZE = 30;
 let currentPage = 0;
@@ -519,16 +549,94 @@ let waves = [];         // 104 rows (52 weeks × 2 waves)
 let filtered = [];      // after filter
 let savedTimes = {};    // waveId -> ISO string
 let savedNotes = {};    // waveId -> string
+let isSaving = false;
+
+// ── JSONBIN HELPERS ────────────────────────────────────────────────────
+function getBinUrl() {
+  const id = window._JSONBIN_BIN_ID || JSONBIN_BIN_ID;
+  return `https://api.jsonbin.io/v3/b/${id}`;
+}
+function getApiKey() {
+  return window._JSONBIN_API_KEY || JSONBIN_API_KEY;
+}
+
+async function loadFromCloud() {
+  showSyncStatus('loading');
+  try {
+    const res = await fetch(getBinUrl() + '/latest', {
+      headers: { 'X-Master-Key': getApiKey() }
+    });
+    if (!res.ok) throw new Error('Load failed');
+    const json = await res.json();
+    const data = json.record || {};
+    savedTimes = data.savedTimes || {};
+    savedNotes = data.savedNotes || {};
+    showSyncStatus('ok');
+  } catch (e) {
+    console.error('Load error:', e);
+    showSyncStatus('error');
+  }
+}
+
+async function saveToCloud() {
+  if (isSaving) return;
+  isSaving = true;
+  showSyncStatus('saving');
+  try {
+    const res = await fetch(getBinUrl(), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Master-Key': getApiKey()
+      },
+      body: JSON.stringify({ savedTimes, savedNotes })
+    });
+    if (!res.ok) throw new Error('Save failed');
+    showSyncStatus('ok');
+  } catch (e) {
+    console.error('Save error:', e);
+    showSyncStatus('error');
+  } finally {
+    isSaving = false;
+  }
+}
+
+function showSyncStatus(state) {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  const states = {
+    loading: { text: '⟳ Loading...', color: 'var(--muted)' },
+    saving:  { text: '⟳ Saving...',  color: 'var(--warn)'  },
+    ok:      { text: '✓ Synced',      color: 'var(--success)' },
+    error:   { text: '✗ Sync Error',  color: 'var(--danger)'  },
+    setup:   { text: '⚠ Setup Required', color: 'var(--warn)' },
+  };
+  const s = states[state] || states.ok;
+  el.textContent = s.text;
+  el.style.color = s.color;
+}
+
+function needsSetup() {
+  return JSONBIN_BIN_ID === 'PLACEHOLDER_REPLACE_ME' || JSONBIN_API_KEY.includes('PLACEHOLDER');
+}
 
 // ── INIT ───────────────────────────────────────────────────────────────
-function init() {
+async function init() {
   populateYearSelects();
   const now = new Date();
   document.getElementById('month-select').value = now.getMonth();
   document.getElementById('week-num').value = getWaveNumForDate(now) || 1;
   generateWaves();
-  applyFilters();
   startClock();
+
+  if (needsSetup()) {
+    showSyncStatus('setup');
+    showSetupModal();
+  } else {
+    await loadFromCloud();
+  }
+
+  applyFilters();
   jumpToCurrentWeek();
   autoSelectCurrentMonth();
 }
@@ -836,11 +944,11 @@ function closeAllEdits() {
 function saveDT(id) {
   const val = document.getElementById(`dti-${id}`).value;
   if (!val) { clearDT(id); return; }
-  // store as ISO
   savedTimes[id] = new Date(val).toISOString();
   closeAllEdits();
   renderTable();
   renderStats();
+  saveToCloud();
 }
 
 function clearDT(id) {
@@ -848,10 +956,12 @@ function clearDT(id) {
   closeAllEdits();
   renderTable();
   renderStats();
+  saveToCloud();
 }
 
 function saveNote(id, val) {
   savedNotes[id] = val;
+  saveToCloud();
 }
 
 // ── JUMP ────────────────────────────────────────────────────────────────
@@ -919,6 +1029,25 @@ function escHtml(s) {
 document.addEventListener('click', e => {
   if (!e.target.closest('.dt-input-wrap')) closeAllEdits();
 });
+
+// ── SETUP MODAL ────────────────────────────────────────────────────────
+function showSetupModal() {
+  document.getElementById('setup-modal').style.display = 'grid';
+}
+
+function applySetup() {
+  const binId  = document.getElementById('setup-bin-id').value.trim();
+  const apiKey = document.getElementById('setup-api-key').value.trim();
+  if (!binId || !apiKey) { alert('Please enter both the Bin ID and Master Key.'); return; }
+  // Patch the live constants for this session
+  window._JSONBIN_BIN_ID  = binId;
+  window._JSONBIN_API_KEY = apiKey;
+  document.getElementById('setup-modal').style.display = 'none';
+  loadFromCloud().then(() => { renderTable(); renderStats(); });
+}
+
+// Override fetch URLs if setup was applied at runtime
+const _origLoadFromCloud = loadFromCloud;
 
 // ── START ──────────────────────────────────────────────────────────────
 init();
