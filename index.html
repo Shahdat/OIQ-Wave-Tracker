@@ -271,8 +271,8 @@
     z-index: 50;
     background: var(--surface2);
     border: 1px solid var(--accent);
-    padding: 8px;
-    min-width: 280px;
+    padding: 10px;
+    min-width: 300px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.5);
   }
   .dt-edit.open { display: block; }
@@ -283,21 +283,22 @@
     text-transform: uppercase;
     letter-spacing: 0.08em;
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
   }
-  .dt-edit input[type="datetime-local"] {
-    width: 100%;
+  .dt-picker-row { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+  .dt-picker-row select, .dt-picker-row input[type="number"] {
     background: var(--bg);
     border: 1px solid var(--border2);
     color: var(--text);
-    padding: 6px 8px;
+    padding: 5px 6px;
     font-family: var(--mono);
     font-size: 12px;
     outline: none;
-    margin-bottom: 8px;
   }
-  .dt-edit input[type="datetime-local"]:focus { border-color: var(--accent); }
-  .dt-edit-btns { display: flex; gap: 6px; }
+  .dt-picker-row select:focus, .dt-picker-row input:focus { border-color: var(--accent); }
+  .dt-picker-label { font-family: var(--mono); font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; display: block; margin-bottom: 2px; }
+  .dt-picker-field { display: flex; flex-direction: column; }
+  .dt-edit-btns { display: flex; gap: 6px; margin-top: 4px; }
   .btn-save {
     background: var(--accent);
     border: none;
@@ -832,14 +833,75 @@ function buildRow(w, curWeek, today) {
 function buildDtCell(waveId, dtValue) {
   const displayText = dtValue ? formatDT(dtValue) : '— click to set';
   const isEmpty = !dtValue;
+
+  // Parse existing value for pre-filling dropdowns
+  let pMonth=1, pDay=1, pYear=new Date().getFullYear(), pHour=7, pMin=0, pAmpm='AM';
+  if (dtValue) {
+    const d = new Date(dtValue);
+    // Show in local time of browser
+    pMonth = d.getMonth() + 1;
+    pDay   = d.getDate();
+    pYear  = d.getFullYear();
+    let h  = d.getHours();
+    pMin   = d.getMinutes();
+    pAmpm  = h >= 12 ? 'PM' : 'AM';
+    pHour  = h % 12 || 12;
+  }
+
+  const monthOpts = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    .map((m,i) => `<option value="${i+1}" ${pMonth===i+1?'selected':''}>${m}</option>`).join('');
+
+  const dayOpts = Array.from({length:31},(_,i)=>i+1)
+    .map(d => `<option value="${d}" ${pDay===d?'selected':''}>${d}</option>`).join('');
+
+  const yearNow = new Date().getFullYear();
+  const yearOpts = [yearNow-1, yearNow, yearNow+1]
+    .map(y => `<option value="${y}" ${pYear===y?'selected':''}>${y}</option>`).join('');
+
+  const hourOpts = Array.from({length:12},(_,i)=>i+1)
+    .map(h => `<option value="${h}" ${pHour===h?'selected':''}>${String(h).padStart(2,'0')}</option>`).join('');
+
+  const minOpts = [0,5,10,15,20,25,30,35,40,45,50,55]
+    .map(m => `<option value="${m}" ${pMin===m?'selected':''}>${String(m).padStart(2,'0')}</option>`).join('');
+
   return `<div class="dt-cell">
     <div class="dt-input-wrap">
       <div class="dt-display ${isEmpty ? 'empty' : ''}" onclick="openEdit('${waveId}')">
         <span class="dt-icon">⏱</span>${displayText}
       </div>
       <div class="dt-edit" id="edit-${waveId}">
-        <label>Actual Load Date &amp; Time (Local)</label>
-        <input type="datetime-local" id="dti-${waveId}" value="${dtValue ? toLocalDTInput(dtValue) : ''}">
+        <label>Actual Load Date &amp; Time (PST)</label>
+        <div class="dt-picker-row">
+          <div class="dt-picker-field">
+            <span class="dt-picker-label">Month</span>
+            <select id="dti-month-${waveId}">${monthOpts}</select>
+          </div>
+          <div class="dt-picker-field">
+            <span class="dt-picker-label">Day</span>
+            <select id="dti-day-${waveId}">${dayOpts}</select>
+          </div>
+          <div class="dt-picker-field">
+            <span class="dt-picker-label">Year</span>
+            <select id="dti-year-${waveId}">${yearOpts}</select>
+          </div>
+        </div>
+        <div class="dt-picker-row">
+          <div class="dt-picker-field">
+            <span class="dt-picker-label">Hour</span>
+            <select id="dti-hour-${waveId}">${hourOpts}</select>
+          </div>
+          <div class="dt-picker-field">
+            <span class="dt-picker-label">Min</span>
+            <select id="dti-min-${waveId}">${minOpts}</select>
+          </div>
+          <div class="dt-picker-field">
+            <span class="dt-picker-label">AM/PM</span>
+            <select id="dti-ampm-${waveId}">
+              <option value="AM" ${pAmpm==='AM'?'selected':''}>AM</option>
+              <option value="PM" ${pAmpm==='PM'?'selected':''}>PM</option>
+            </select>
+          </div>
+        </div>
         <div class="dt-edit-btns">
           <button class="btn-save" onclick="saveDT('${waveId}')">Save</button>
           <button class="btn-clear" onclick="clearDT('${waveId}')">Clear</button>
@@ -942,9 +1004,22 @@ function closeAllEdits() {
 }
 
 function saveDT(id) {
-  const val = document.getElementById(`dti-${id}`).value;
-  if (!val) { clearDT(id); return; }
-  savedTimes[id] = new Date(val).toISOString();
+  const month = parseInt(document.getElementById(`dti-month-${id}`).value);
+  const day   = parseInt(document.getElementById(`dti-day-${id}`).value);
+  const year  = parseInt(document.getElementById(`dti-year-${id}`).value);
+  let   hour  = parseInt(document.getElementById(`dti-hour-${id}`).value);
+  const min   = parseInt(document.getElementById(`dti-min-${id}`).value);
+  const ampm  = document.getElementById(`dti-ampm-${id}`).value;
+
+  if (ampm === 'PM' && hour !== 12) hour += 12;
+  if (ampm === 'AM' && hour === 12) hour = 0;
+
+  // Build as PST: user is entering PST time, convert to UTC for storage
+  const isPDT = isDaylightSaving(new Date(year, month-1, day));
+  const utcOffset = isPDT ? 7 : 8;
+  const utcDate = new Date(Date.UTC(year, month-1, day, hour + utcOffset, min, 0));
+
+  savedTimes[id] = utcDate.toISOString();
   closeAllEdits();
   renderTable();
   renderStats();
@@ -1012,13 +1087,6 @@ function formatDT(iso) {
     hour: '2-digit', minute: '2-digit',
     hour12: true
   }) + ' PST';
-}
-
-function toLocalDTInput(iso) {
-  // Convert ISO to local datetime-local input format
-  const d = new Date(iso);
-  const pad = n => String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function escHtml(s) {
