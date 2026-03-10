@@ -805,7 +805,7 @@ function buildRow(w, curWeek, today) {
 
   // DateTime
   const dt = savedTimes[w.id] || '';
-  const dtCell = buildDtCell(w.id, dt);
+  const dtCell = buildDtCell(w.id, dt, w.loadDay);
 
   // Status
   const statusCell = buildStatus(w, dt);
@@ -830,20 +830,28 @@ function buildRow(w, curWeek, today) {
   </tr>`;
 }
 
-function buildDtCell(waveId, dtValue) {
+function buildDtCell(waveId, dtValue, loadDay) {
   const displayText = dtValue ? formatDT(dtValue) : '— click to set';
   const isEmpty = !dtValue;
 
-  // Parse existing value for pre-filling dropdowns
-  let pMonth=1, pDay=1, pYear=new Date().getFullYear(), pHour=7, pMin=0, pAmpm='AM';
+  // Default to the wave's load day date at 07:00 AM if nothing saved yet
+  const defaultDate = loadDay || new Date();
+  let pMonth = defaultDate.getMonth() + 1;
+  let pDay   = defaultDate.getDate();
+  let pYear  = defaultDate.getFullYear();
+  let pHour  = 7;
+  let pMin   = 0;
+  let pAmpm  = 'AM';
+
   if (dtValue) {
+    // Override with saved value — convert UTC ISO to PST for display
     const d = new Date(dtValue);
-    // Show in local time of browser
-    pMonth = d.getMonth() + 1;
-    pDay   = d.getDate();
-    pYear  = d.getFullYear();
-    let h  = d.getHours();
-    pMin   = d.getMinutes();
+    const pst = new Date(d.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+    pMonth = pst.getMonth() + 1;
+    pDay   = pst.getDate();
+    pYear  = pst.getFullYear();
+    let h  = pst.getHours();
+    pMin   = pst.getMinutes();
     pAmpm  = h >= 12 ? 'PM' : 'AM';
     pHour  = h % 12 || 12;
   }
