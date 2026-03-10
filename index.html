@@ -488,11 +488,25 @@
     <input type="number" id="week-num" min="1" max="52" value="1" style="width:60px" oninput="applyFilters()">
   </div>
 
-  <div class="filter-group" id="range-filter" style="display:none">
+  <div class="filter-group" id="range-filter" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
     <span class="filter-label">From:</span>
-    <input type="date" id="range-from" onchange="applyFilters()">
-    <span class="filter-label" style="margin-left:4px">To:</span>
-    <input type="date" id="range-to" onchange="applyFilters()">
+    <select id="range-from-month" onchange="applyFilters()" style="font-family:var(--mono);font-size:11px;">
+      <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+      <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+      <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+      <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+    </select>
+    <select id="range-from-day" onchange="applyFilters()" style="font-family:var(--mono);font-size:11px;width:52px"></select>
+    <select id="range-from-year" onchange="applyFilters()" style="font-family:var(--mono);font-size:11px;"></select>
+    <span class="filter-label" style="margin-left:6px">To:</span>
+    <select id="range-to-month" onchange="applyFilters()" style="font-family:var(--mono);font-size:11px;">
+      <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+      <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+      <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+      <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+    </select>
+    <select id="range-to-day" onchange="applyFilters()" style="font-family:var(--mono);font-size:11px;width:52px"></select>
+    <select id="range-to-year" onchange="applyFilters()" style="font-family:var(--mono);font-size:11px;"></select>
   </div>
 
   <div class="sep"></div>
@@ -644,14 +658,36 @@ async function init() {
 
 function populateYearSelects() {
   const year = new Date().getFullYear();
-  [document.getElementById('year-select'), document.getElementById('main-year-select')].forEach(sel => {
-    for (let y = year - 2; y <= year + 2; y++) {
+  const years = [year-2, year-1, year, year+1, year+2];
+
+  [document.getElementById('year-select'), document.getElementById('main-year-select'),
+   document.getElementById('range-from-year'), document.getElementById('range-to-year')].forEach(sel => {
+    years.forEach(y => {
       const o = document.createElement('option');
       o.value = y; o.textContent = y;
       if (y === year) o.selected = true;
       sel.appendChild(o);
+    });
+  });
+
+  // Populate day dropdowns 1-31
+  ['range-from-day','range-to-day'].forEach(id => {
+    const sel = document.getElementById(id);
+    for (let d = 1; d <= 31; d++) {
+      const o = document.createElement('option');
+      o.value = d; o.textContent = d;
+      sel.appendChild(o);
     }
   });
+
+  // Default range-to to end of current month
+  const now = new Date();
+  document.getElementById('range-from-month').value = now.getMonth() + 1;
+  document.getElementById('range-from-day').value   = 1;
+  document.getElementById('range-from-year').value  = year;
+  document.getElementById('range-to-month').value   = now.getMonth() + 1;
+  document.getElementById('range-to-day').value     = 31;
+  document.getElementById('range-to-year').value    = year;
 }
 
 function autoSelectCurrentMonth() {
@@ -684,7 +720,7 @@ function generateWaves() {
     ['A', 'B'].forEach(letter => {
       const loadDay = letter === 'A' ? new Date(monday) : new Date(thursday);
       waves.push({
-        id: `${w}${letter}`,
+        id: `${selectedYear}-${w}${letter}`,
         waveNum: w,
         letter,
         weekOf: new Date(monday),
@@ -750,14 +786,15 @@ function applyFilters() {
     const wn = parseInt(document.getElementById('week-num').value);
     filtered = waves.filter(w => w.waveNum === wn);
   } else if (currentView === 'range') {
-    const from = document.getElementById('range-from').value;
-    const to   = document.getElementById('range-to').value;
-    if (!from || !to) { filtered = waves.slice(); }
-    else {
-      const fd = new Date(from + 'T00:00:00');
-      const td = new Date(to   + 'T23:59:59');
-      filtered = waves.filter(w => w.loadDay >= fd && w.loadDay <= td);
-    }
+    const fm = parseInt(document.getElementById('range-from-month').value);
+    const fd = parseInt(document.getElementById('range-from-day').value);
+    const fy = parseInt(document.getElementById('range-from-year').value);
+    const tm = parseInt(document.getElementById('range-to-month').value);
+    const td = parseInt(document.getElementById('range-to-day').value);
+    const ty = parseInt(document.getElementById('range-to-year').value);
+    const fromDate = new Date(fy, fm-1, fd, 0, 0, 0);
+    const toDate   = new Date(ty, tm-1, td, 23, 59, 59);
+    filtered = waves.filter(w => w.loadDay >= fromDate && w.loadDay <= toDate);
   }
   currentPage = 0;
   renderTable();
